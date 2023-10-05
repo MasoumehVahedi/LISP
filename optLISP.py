@@ -62,30 +62,6 @@ class LISP:
         page_numbers = byte_locations // self.page_size
         y_pred = self.regression_model(X, page_numbers)
 
-        # 1. Collect Data
-        vertex_counts = [len(polygon) for cluster in self.sorted_clusters for polygon in cluster]
-        byte_sizes = [self.get_byte_size(polygon) for cluster in self.sorted_clusters for polygon in cluster]
-
-        # 2. Plot
-        plt.figure(figsize=(10, 6))
-        plt.scatter(vertex_counts, byte_sizes, color='blue', alpha=0.5)
-
-        # Fitting a linear regression line
-        m, b = np.polyfit(vertex_counts, byte_sizes, 1)
-        plt.plot(vertex_counts, m * np.array(vertex_counts) + b, color='red')
-
-        plt.title("Relationship between Vertex Counts and Byte Sizes")
-        plt.xlabel("Vertex Count")
-        plt.ylabel("Byte Size")
-        plt.grid(True)
-        plt.show()
-
-        # Calculate R-squared value
-        correlation_matrix = np.corrcoef(vertex_counts, byte_sizes)
-        correlation_xy = correlation_matrix[0, 1]
-        r_squared = correlation_xy ** 2
-        print(f"R-squared value: {r_squared:.2f}")
-
         self.pages = []
         self.cluster_hash_tables = defaultdict(dict)
 
