@@ -1,4 +1,4 @@
-# LISP
+# SPLindex
 
 Link to access datasets:
 
