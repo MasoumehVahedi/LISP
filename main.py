@@ -19,8 +19,7 @@ import utils
 
 def load_data(data_dir):
     # Read data
-    #polygons_path = os.path.join(data_dir, Config().land_polygon_name)
-    polygons_path = "/Users/vahedi/Library/CloudStorage/OneDrive-RoskildeUniversitet/Python Projects/FinalLISP/Final SPLI Code for Paper ISMIS/data/water_poly.npy"
+    polygons_path = os.path.join(data_dir, Config().land_polygon_name)
     polygons = np.load(polygons_path, allow_pickle=True)
     return polygons
 
