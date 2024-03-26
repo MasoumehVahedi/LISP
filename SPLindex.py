@@ -224,18 +224,6 @@ class SPLindex:
                 if polygon_mbb[0] <= query_point[0] <= polygon_mbb[2] and polygon_mbb[1] <= query_point[1] <= polygon_mbb[3]:
                     yield value
 
-    def getRangeQueryWithoutModel(self, model, query_rect, hash_tables):
-        z_min = MortonCode().interleave_latlng(query_rect[2], query_rect[0])
-        z_max = MortonCode().interleave_latlng(query_rect[3], query_rect[1])
-        z_range = [z_min, z_max]
-        # Step 1- Filtering step to predict cluster IDs
-        predicted_labels = self.search(model, z_range)
-        # Step 2- Intermediate Filtering step
-        hash_pred_clusters = []
-        for label in predicted_labels:
-            hash_pred_clusters.append(hash_tables.get(label))
-        query_results = self.rangeQueryIntermediateResult(query_rect, hash_pred_clusters)
-        return query_results, hash_pred_clusters
 
     def getRangeQueryWithModel(self, model, query_rect, hash_tables):
         z_min = MortonCode().interleave_latlng(query_rect[2], query_rect[0])
@@ -243,12 +231,15 @@ class SPLindex:
         z_range = [z_min, z_max]
         # Step 1- Filtering step to predict cluster IDs
         predicted_labels = self.predClusterIdsRangeQuery(model, z_range)
+        # Get cluster ids without model
+        # predicted_labels = self.search(model, z_range)
         # Step 2- Intermediate Filtering step
         hash_pred_clusters = []
         for label in predicted_labels:
             hash_pred_clusters.append(hash_tables.get(label[0]))
         query_results = self.rangeQueryIntermediateResult(query_rect, hash_pred_clusters)
         return query_results, hash_pred_clusters
+
 
     def pointQuery(self, model, query_point, hash_tables):
         point_query = Point(query_point)
