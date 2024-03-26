@@ -1,8 +1,6 @@
 import pickle
 import gzip
 import gc
-import shelve
-import matplotlib.pyplot as plt
 from collections import defaultdict
 
 from sklearn.cluster import Birch
@@ -13,13 +11,12 @@ from ZAdress import MortonCode
 from utils import *
 
 
-class LISP:
+
+class SPLindex:
     def __init__(self, polygons, page_size):
         self.polygons = polygons
         self.page_size = page_size
         self.config = Config()
-        self.leaf_count = 0
-        self.internal_count = 0
 
         self.X = np.array([self.compute_features(polygon) for polygon in self.polygons], dtype=np.float32)
         self.clusters, self.cluster_labels = self.get_clusters()
@@ -74,22 +71,16 @@ class LISP:
                 while len(self.pages) <= page_index:
                     self.pages.append([])
                 self.pages[page_index].append((i, self.dumps(original_polygon)))
-                #simplified_polygon = original_polygon.simplify(tolerance=0.5)
-                # polygon_page_nums_cluster[bbp_tuple] = (simplified_polygon.wkb, page_index)
                 polygon_page_nums_cluster[bbp_tuple] = (self.dumps(original_polygon.simplify(tolerance=0.5)), page_index)
-                #polygon_page_nums_cluster[bbp_tuple] = (k, page_index)
                 i += 1
+
             self.cluster_hash_tables[j] = polygon_page_nums_cluster
         self.save_pages_to_disk()
-
-        #serialized_data = pickle.dumps(self.cluster_hash_tables)
-        #with gzip.open("cluster_hash_tables.pkl.gz", 'wb') as f:
-        #    f.write(serialized_data)
         yield self.cluster_hash_tables
 
         del self.pages
         del self.cluster_hash_tables
-        gc.collect()  # Force a garbage collection to free up memory
+        gc.collect()
 
 
     def compute_features(self, polygon):
@@ -100,14 +91,13 @@ class LISP:
         birch = Birch(branching_factor=self.config.bf, n_clusters=self.config.n_clusters, threshold=self.config.threshold).fit(self.X)
         self.cluster_labels = birch.labels_
         self.num_clusters = len(set(self.cluster_labels))
-        #print('Number of clusters:', self.num_clusters)
+        print('Number of clusters:', self.num_clusters)
         # Using list comprehension and generator to reduce memory
-        combined_clusters = [
+        self.clusters = [
             [(polygon, rectangle) for polygon, rectangle in
              zip(self.polygons[self.cluster_labels == n], self.X[self.cluster_labels == n])]
             for n in range(self.num_clusters)
         ]
-        self.clusters = combined_clusters
         return self.clusters, self.cluster_labels
 
 
@@ -131,20 +121,38 @@ class LISP:
         self.sorted_clusters_IDs = [i for i, _ in enumerate(self.sorted_clusters)]
         return self.z_ranges_sorted, self.sorted_clusters_IDs
 
-    def pred_cluster_ids(self, node, z_range):
+
+    def search(self, node, z_range):
+        result = set()
+        if node is None:
+            return None
+
+        if node.z_ranges[0][0] <= z_range[0] and node.z_ranges[-1][1] >= z_range[1]:
+            left_cluster_probs = self.search(node.left_child, z_range)
+            result.add(left_cluster_probs)
+
+        if node.z_ranges[0][0] > z_range[0] and node.z_ranges[-1][1] < z_range[1]:
+            right_cluster_probs = self.search(node.right_child, z_range)
+            result.add(right_cluster_probs)
+
+        if node.z_ranges[0][0] > z_range[0] and node.z_ranges[-1][1] < z_range[1]:
+            right_cluster_probs = self.search(node.right_child, z_range)
+            result.add(right_cluster_probs)
+
+        return result
+
+    def pred_cluster_ids_range_queries(self, node, z_range):
         if node.leaf_model is not None:
-            self.leaf_count += 1
             for (z_min, z_max), cluster_id in zip(node.z_ranges, node.clusters):
                 if z_min <= z_range[1] and z_max >= z_range[0]:
                     yield (cluster_id, 1 / len(node.labels))
         else:
-            self.internal_count += 1
             if node.internal_model is not None and node.z_ranges[0][0] <= z_range[0] and node.z_ranges[-1][1] >= \
                     z_range[1]:
                 X = np.array([[z_range[0], z_range[1]]])
                 probs = node.internal_model.predict(X).flatten()
-                left_cluster_probs = list(self.pred_cluster_ids(node.left_child, z_range))
-                right_cluster_probs = list(self.pred_cluster_ids(node.right_child, z_range))
+                left_cluster_probs = list(self.pred_cluster_ids_range_queries(node.left_child, z_range))
+                right_cluster_probs = list(self.pred_cluster_ids_range_queries(node.right_child, z_range))
 
                 for cluster_id in node.labels:
                     left_prob = sum(p for c_id, p in left_cluster_probs if c_id == cluster_id)
@@ -153,9 +161,9 @@ class LISP:
                     yield (cluster_id, prob)
             else:
                 if node.left_child and node.left_child.z_ranges[-1][1] >= z_range[0]:
-                    yield from self.pred_cluster_ids(node.left_child, z_range)
+                    yield from self.pred_cluster_ids_range_queries(node.left_child, z_range)
                 if node.right_child and node.right_child.z_ranges[0][0] <= z_range[1]:
-                    yield from self.pred_cluster_ids(node.right_child, z_range)
+                    yield from self.pred_cluster_ids_range_queries(node.right_child, z_range)
 
 
     def pred_cluster_ids_for_point_query(self, node, point_query):
@@ -190,15 +198,17 @@ class LISP:
 
 
     def get_predict_clusters(self, model, z_range):
-        return self.pred_cluster_ids(model, z_range)
+        return self.pred_cluster_ids_range_queries(model, z_range)
 
 
     def get_range_query_result(self, query_rect, hash_tables):
         xim, xmax, ymin, ymax = query_rect
+        query_result = []
         for cluster_polygons in hash_tables:
             for polygon_mbb, value in cluster_polygons.items():
                 if polygon_mbb[2] > xim and polygon_mbb[0] < xmax and polygon_mbb[3] > ymin and polygon_mbb[1] < ymax:
-                    yield value
+                    query_result.append(value)
+        return query_result
 
 
     def get_predict_point_clusters(self, model, z_range):
@@ -206,7 +216,8 @@ class LISP:
 
 
     def get_point_query_result(self, query_point, hash_tables):
-        # Given a rectangle with points (x1,y1) and (x2,y2) and assuming x1 < x2 and y1 < y2, a point (x,y) is within that rectangle if x1 < x < x2 and y1 < y < y2.
+        # Given a rectangle with points (x1,y1) and (x2,y2) and assuming x1 < x2 and y1 < y2, a point (x,y) is within
+        # that rectangle if x1 < x < x2 and y1 < y < y2.
         for pred_clusters in hash_tables:
             for polygon_mbb, value in pred_clusters.items():
                 if polygon_mbb[0] <= query_point[0] <= polygon_mbb[2] and polygon_mbb[1] <= query_point[1] <= polygon_mbb[3]:

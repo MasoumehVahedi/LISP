@@ -11,17 +11,15 @@ class Config(object):
 
         def __init__(self):
             # params for clustering algorithm
-            #self.bf = 15  # The branching factor for 5M
             self.bf = 10  # The branching factor for land and water
             self.n_clusters = None
             self.threshold = 11.5
-            #self.threshold = 0.5
             self.max_depth = 300  # number of tree depth
             self.page_size = 4096
 
             # Data path
             filename = "data/"
-            self.land_query_range_path = os.path.join(filename, "land_query_ranges_2%.npy")
+            self.land_query_range_path = os.path.join(filename, "landuse_query_ranges_1%.npy")
             self.water_query_range_path = os.path.join(filename, "water_query_ranges_1%.npy")
             self.corr_query_range_path = os.path.join(filename, "landuse_query_ranges_0.05%.npy")
             self.zipf_query_range_path = os.path.join(filename, "polyZipf_query_ranges_0.05%.npy")

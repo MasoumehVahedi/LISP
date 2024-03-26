@@ -1,4 +1,5 @@
 import numpy as np
+import pickle
 import sys
 
 from shapely.geometry import Polygon
@@ -82,6 +83,29 @@ def get_rtree_index_size(idx):
     # Calculate the size of entries within the index
     num_entries = sum(1 for _ in idx.intersection(idx.bounds, objects=True))
     size += num_entries * sys.getsizeof(idx.bounds)
+    return size
+
+
+def save_clusters(clusters, filename="clusters.pkl"):
+    with open(filename, "wb") as f:
+        pickle.dump(clusters, f)
+
+def save_model(model, filename="model.pkl"):
+    with open(filename, "wb") as f:
+        pickle.dump(model, f)
+
+def save_hashTable(model, filename="hashTable.pkl"):
+    with open(filename, "wb") as f:
+        pickle.dump(model, f)
+
+def get_size(d):
+    size = sys.getsizeof(d)
+    for key, value in d.items():
+        size += sys.getsizeof(key)
+        if isinstance(value, dict):
+            size += get_size(value)
+        else:
+            size += sys.getsizeof(value)
     return size
 
 
