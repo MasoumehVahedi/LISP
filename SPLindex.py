@@ -2,6 +2,7 @@ import pickle
 import gzip
 import gc
 from collections import defaultdict
+from shapely.geometry import box, Point
 
 from sklearn.cluster import Birch
 from sklearn.linear_model import LinearRegression
@@ -18,16 +19,16 @@ class SPLindex:
         self.page_size = page_size
         self.config = Config()
 
-        self.X = np.array([self.compute_features(polygon) for polygon in self.polygons], dtype=np.float32)
-        self.clusters, self.cluster_labels = self.get_clusters()
+        self.X = np.array([self.computeFeatures(polygon) for polygon in self.polygons], dtype=np.float32)
+        self.clusters, self.cluster_labels = self.getClusters()
 
-    def extract_features(self, polygon):
+    def extractFeatures(self, polygon):
         return [len(polygon.exterior.coords)]
 
-    def get_byte_size(self, polygon):
+    def getByteSize(self, polygon):
         return len(polygon[0].exterior.coords) * 16
 
-    def regression_model(self, X, page_numbers):
+    def regressionModel(self, X, page_numbers):
         y = page_numbers.reshape(-1, 1)
         regressor = LinearRegression().fit(X, y)
         y_pred = regressor.predict(X).reshape(-1)
@@ -41,7 +42,7 @@ class SPLindex:
     def loads(serialized_data):
         return pickle.loads(serialized_data)
 
-    def save_pages_to_disk(self, filename="pages.bin"):
+    def savePagesToDisk(self, filename="pages.bin"):
         page_map = []
         with open(filename, "wb") as f:
             for page in self.pages:
@@ -52,12 +53,12 @@ class SPLindex:
         with open("page_map.pkl", "wb") as f:
             pickle.dump(page_map, f)
 
-    def get_disk_pages(self):
-        byte_sizes_gen = (self.get_byte_size(polygon) for cluster in self.sorted_clusters for polygon in cluster)
+    def getDiskPages(self):
+        byte_sizes_gen = (self.getByteSize(polygon) for cluster in self.sorted_clusters for polygon in cluster)
         X = np.array([[byte_size] for byte_size in byte_sizes_gen])
         byte_locations = np.cumsum(X)
         page_numbers = byte_locations // self.page_size
-        y_pred = self.regression_model(X, page_numbers)
+        y_pred = self.regressionModel(X, page_numbers)
 
         self.pages = []
         self.cluster_hash_tables = defaultdict(dict)
@@ -75,7 +76,7 @@ class SPLindex:
                 i += 1
 
             self.cluster_hash_tables[j] = polygon_page_nums_cluster
-        self.save_pages_to_disk()
+        self.savePagesToDisk()
         yield self.cluster_hash_tables
 
         del self.pages
@@ -83,11 +84,11 @@ class SPLindex:
         gc.collect()
 
 
-    def compute_features(self, polygon):
+    def computeFeatures(self, polygon):
         return np.array(polygon.bounds)
 
 
-    def get_clusters(self):
+    def getClusters(self):
         birch = Birch(branching_factor=self.config.bf, n_clusters=self.config.n_clusters, threshold=self.config.threshold).fit(self.X)
         self.cluster_labels = birch.labels_
         self.num_clusters = len(set(self.cluster_labels))
@@ -101,7 +102,7 @@ class SPLindex:
         return self.clusters, self.cluster_labels
 
 
-    def sort_clusters_Zaddress(self, clusters):
+    def sortClustersZaddress(self, clusters):
         MBR_clusters = []
         for i, cluster in enumerate(clusters):
             mbb = calculate_bounding_box(cluster)
@@ -141,7 +142,7 @@ class SPLindex:
 
         return result
 
-    def pred_cluster_ids_range_queries(self, node, z_range):
+    def predClusterIdsRangeQuery(self, node, z_range):
         if node.leaf_model is not None:
             for (z_min, z_max), cluster_id in zip(node.z_ranges, node.clusters):
                 if z_min <= z_range[1] and z_max >= z_range[0]:
@@ -151,8 +152,8 @@ class SPLindex:
                     z_range[1]:
                 X = np.array([[z_range[0], z_range[1]]])
                 probs = node.internal_model.predict(X).flatten()
-                left_cluster_probs = list(self.pred_cluster_ids_range_queries(node.left_child, z_range))
-                right_cluster_probs = list(self.pred_cluster_ids_range_queries(node.right_child, z_range))
+                left_cluster_probs = list(self.predClusterIdsRangeQuery(node.left_child, z_range))
+                right_cluster_probs = list(self.predClusterIdsRangeQuery(node.right_child, z_range))
 
                 for cluster_id in node.labels:
                     left_prob = sum(p for c_id, p in left_cluster_probs if c_id == cluster_id)
@@ -161,12 +162,12 @@ class SPLindex:
                     yield (cluster_id, prob)
             else:
                 if node.left_child and node.left_child.z_ranges[-1][1] >= z_range[0]:
-                    yield from self.pred_cluster_ids_range_queries(node.left_child, z_range)
+                    yield from self.predClusterIdsRangeQuery(node.left_child, z_range)
                 if node.right_child and node.right_child.z_ranges[0][0] <= z_range[1]:
-                    yield from self.pred_cluster_ids_range_queries(node.right_child, z_range)
+                    yield from self.predClusterIdsRangeQuery(node.right_child, z_range)
 
 
-    def pred_cluster_ids_for_point_query(self, node, point_query):
+    def predClusterIdsPointQuery(self, node, point_query):
         if node.leaf_model is not None:
             # leaf node: return the first cluster ID where point_query falls within the z_range
             return [(cluster_id, 1 / len(node.labels)) for (z_min, z_max), cluster_id in zip(node.z_ranges, node.clusters)
@@ -182,12 +183,12 @@ class SPLindex:
                     # search left child
                     if node.left_child and node.left_child.z_ranges[0][0] <= point_query <= \
                             node.left_child.z_ranges[-1][1]:
-                        left_cluster_probs = self.pred_cluster_ids_for_point_query(node.left_child, point_query)
+                        left_cluster_probs = self.predClusterIdsPointQuery(node.left_child, point_query)
                         cluster_probs.extend(left_cluster_probs)
                     # search right child
                     if node.right_child and node.right_child.z_ranges[0][0] <= point_query <= \
                             node.right_child.z_ranges[-1][1]:
-                        right_cluster_probs = self.pred_cluster_ids_for_point_query(node.right_child, point_query)
+                        right_cluster_probs = self.predClusterIdsPointQuery(node.right_child, point_query)
                         cluster_probs.extend(right_cluster_probs)
                     if cluster_probs:
                         return cluster_probs
@@ -197,11 +198,11 @@ class SPLindex:
                         return (cluster_id, prob)
 
 
-    def get_predict_clusters(self, model, z_range):
-        return self.pred_cluster_ids_range_queries(model, z_range)
+    def getRangePredictClusters(self, model, z_range):
+        return self.predClusterIdsRangeQuery(model, z_range)
 
 
-    def get_range_query_result(self, query_rect, hash_tables):
+    def rangeQueryIntermediateResult(self, query_rect, hash_tables):
         xim, xmax, ymin, ymax = query_rect
         query_result = []
         for cluster_polygons in hash_tables:
@@ -211,16 +212,58 @@ class SPLindex:
         return query_result
 
 
-    def get_predict_point_clusters(self, model, z_range):
-        return self.pred_cluster_ids_for_point_query(model, z_range)
+    def getPointPredictClusters(self, model, z_range):
+        return self.predClusterIdsPointQuery(model, z_range)
 
 
-    def get_point_query_result(self, query_point, hash_tables):
+    def pointQueryIntermediateResult(self, query_point, hash_tables):
         # Given a rectangle with points (x1,y1) and (x2,y2) and assuming x1 < x2 and y1 < y2, a point (x,y) is within
         # that rectangle if x1 < x < x2 and y1 < y < y2.
         for pred_clusters in hash_tables:
             for polygon_mbb, value in pred_clusters.items():
                 if polygon_mbb[0] <= query_point[0] <= polygon_mbb[2] and polygon_mbb[1] <= query_point[1] <= polygon_mbb[3]:
                     yield value
+
+    def getRangeQueryWithoutModel(self, model, query_rect, hash_tables):
+        z_min = MortonCode().interleave_latlng(query_rect[2], query_rect[0])
+        z_max = MortonCode().interleave_latlng(query_rect[3], query_rect[1])
+        z_range = [z_min, z_max]
+        # Step 1- Filtering step to predict cluster IDs
+        predicted_labels = self.search(model, z_range)
+        # Step 2- Intermediate Filtering step
+        hash_pred_clusters = []
+        for label in predicted_labels:
+            hash_pred_clusters.append(hash_tables.get(label))
+        query_results = self.rangeQueryIntermediateResult(query_rect, hash_pred_clusters)
+        return query_results, hash_pred_clusters
+
+    def getRangeQueryWithModel(self, model, query_rect, hash_tables):
+        z_min = MortonCode().interleave_latlng(query_rect[2], query_rect[0])
+        z_max = MortonCode().interleave_latlng(query_rect[3], query_rect[1])
+        z_range = [z_min, z_max]
+        # Step 1- Filtering step to predict cluster IDs
+        predicted_labels = self.predClusterIdsRangeQuery(model, z_range)
+        # Step 2- Intermediate Filtering step
+        hash_pred_clusters = []
+        for label in predicted_labels:
+            hash_pred_clusters.append(hash_tables.get(label[0]))
+        query_results = self.rangeQueryIntermediateResult(query_rect, hash_pred_clusters)
+        return query_results, hash_pred_clusters
+
+    def pointQuery(self, model, query_point, hash_tables):
+        point_query = Point(query_point)
+        # Encode the latitude and longitude using Morten encoding
+        z_min = MortonCode().interleave_latlng(point_query.y, point_query.x)
+        # Step 1- Filtering step to predict cluster IDs
+        predicted_labels = self.predClusterIdsPointQuery(model, z_min)
+        # Step 2- Intermediate Filtering step
+        hash_pred_clusters = []
+        for label in predicted_labels:
+            hash_pred_clusters.append(hash_tables.get(label[0]))
+        query_results = self.pointQueryIntermediateResult(query_point, hash_pred_clusters)
+        return query_results, hash_pred_clusters
+
+
+
 
 

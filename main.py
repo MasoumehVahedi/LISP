@@ -16,52 +16,11 @@ import utils
 
 
 
-def range_query_withoutModel(lisp, model, query_rect, hash_tables):
-    z_min = MortonCode().interleave_latlng(query_rect[2], query_rect[0])
-    z_max = MortonCode().interleave_latlng(query_rect[3], query_rect[1])
-    z_range = [z_min, z_max]
-    # Step 1- Filtering step to predict cluster IDs
-    predicted_labels = lisp.get_predict_clusters(model, z_range)
-    # Step 2- Intermediate Filtering step
-    hash_pred_clusters = []
-    for label in predicted_labels:
-        hash_pred_clusters.append(hash_tables.get(label))
-    query_results = lisp.get_range_query_result(query_rect, hash_pred_clusters)
-    return query_results, hash_pred_clusters
-
-
-def range_query_with_model(lisp, model, query_rect, hash_tables):
-    z_min = MortonCode().interleave_latlng(query_rect[2], query_rect[0])
-    z_max = MortonCode().interleave_latlng(query_rect[3], query_rect[1])
-    z_range = [z_min, z_max]
-    # Step 1- Filtering step to predict cluster IDs
-    predicted_labels = lisp.get_predict_clusters(model, z_range)
-    # Step 2- Intermediate Filtering step
-    hash_pred_clusters = []
-    for label in predicted_labels:
-        hash_pred_clusters.append(hash_tables.get(label[0]))
-    query_results = lisp.get_range_query_result(query_rect, hash_pred_clusters)
-    return query_results, hash_pred_clusters
-
-
-def pointsQuery(lisp, model, query_point, hash_tables):
-    point_query = Point(query_point)
-    # Encode the latitude and longitude using Morten encoding
-    z_min = MortonCode().interleave_latlng(point_query.y, point_query.x)
-    # Step 1- Filtering step to predict cluster IDs
-    predicted_labels = lisp.get_predict_point_clusters(model, z_min)
-    # Step 2- Intermediate Filtering step
-    hash_pred_clusters = []
-    for label in predicted_labels:
-        hash_pred_clusters.append(hash_tables.get(label[0]))
-    query_results = lisp.get_point_query_result(query_point, hash_pred_clusters)
-    return query_results, hash_pred_clusters
-
 
 def load_data(data_dir):
     # Read data
     #polygons_path = os.path.join(data_dir, Config().land_polygon_name)
-    polygons_path = "/Users/vahedi/Library/CloudStorage/OneDrive-RoskildeUniversitet/Python Projects/FinalLISP/Final SPLI Code for Paper ISMIS/data/LandPolygons.npy"
+    polygons_path = "/Users/vahedi/Library/CloudStorage/OneDrive-RoskildeUniversitet/Python Projects/FinalLISP/Final SPLI Code for Paper ISMIS/data/water_poly.npy"
     polygons = np.load(polygons_path, allow_pickle=True)
     return polygons
 
@@ -72,12 +31,12 @@ def index_construction():
     polygons = load_data(data_dir)
 
     ########### Build SPLIndex ###########
-    print("-------- SPLIndex building---------")
+    print("-------- SPLindex building---------")
     spli = SPLindex(polygons, page_size=Config().page_size)
     clusters, cluster_labels = spli.clusters, spli.cluster_labels
 
-    z_ranges_sorted, sorted_clusters_IDs = spli.sort_clusters_Zaddress(clusters)
-    hash_tables_generator = spli.get_disk_pages()
+    z_ranges_sorted, sorted_clusters_IDs = spli.sortClustersZaddress(clusters)
+    hash_tables_generator = spli.getDiskPages()
 
     hash_tables = defaultdict(dict)
     for new_hash_tables in hash_tables_generator:
@@ -94,13 +53,13 @@ def index_construction():
     return spli, tree_model, hash_tables
 
 
-def lisp_range_query(lisp, tree_model, query_ranges, hash_tables):
+def splindexRangeQuery(spli, tree_model, query_ranges, hash_tables):
     ########### Range Query ###########
     print("-------- Range Query ---------")
     for query_rect in query_ranges:
         xim, xmax, ymin, ymax = query_rect
         query_rect_poly = Polygon([(xim, ymin), (xmax, ymin), (xmax, ymax), (xim, ymax)])
-        query_results, hash_pred_clusters = range_query_with_model(lisp, tree_model, query_rect, hash_tables)
+        query_results, hash_pred_clusters = spli.getRangeQueryWithModel(tree_model, query_rect, hash_tables)
 
         result = []
         for i in query_results:
@@ -110,12 +69,12 @@ def lisp_range_query(lisp, tree_model, query_ranges, hash_tables):
         print(f"Range query result = {len(result)}")
 
 
-def lisp_point_query(lisp, tree_model, point_queries, hash_tables):
+def splindexPointQuery(spli, tree_model, point_queries, hash_tables):
     ########### Point Query ###########
     print("-------- Point Query ---------")
     for query_point in point_queries:
         query_point_box = box(query_point[0], query_point[1], query_point[0], query_point[1])
-        query_results, hash_pred_clusters = pointsQuery(lisp, tree_model, query_point, hash_tables)
+        query_results, hash_pred_clusters = spli.pointQuery(tree_model, query_point, hash_tables)
 
         result = []
         for i in query_results:
@@ -130,13 +89,13 @@ def main():
     #query_path = os.path.join(range_query_path, Config().land_query_range_path)
     query_path = "landuse_query_ranges_1%.npy"
     query_ranges = np.load(query_path, allow_pickle=True)
-    lisp, tree_model, hash_tables = index_construction()
+    spli, tree_model, hash_tables = index_construction()
 
     ######## Range Query ##########
-    lisp_range_query(lisp, tree_model, query_ranges, hash_tables)
+    splindexRangeQuery(spli, tree_model, query_ranges, hash_tables)
 
     ######## Point Query ##########
-    #lisp_point_query(lisp, tree_model, query_ranges, hash_tables)
+    #splindexPointQuery(spli, tree_model, query_ranges, hash_tables)
 
 
 if __name__ == "__main__":
