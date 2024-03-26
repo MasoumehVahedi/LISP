@@ -85,8 +85,7 @@ def splindexPointQuery(spli, tree_model, point_queries, hash_tables):
 
 def main():
     range_query_path = "./"
-    #query_path = os.path.join(range_query_path, Config().land_query_range_path)
-    query_path = "landuse_query_ranges_1%.npy"
+    query_path = os.path.join(range_query_path, Config().land_query_range_path)
     query_ranges = np.load(query_path, allow_pickle=True)
     spli, tree_model, hash_tables = index_construction()
 
