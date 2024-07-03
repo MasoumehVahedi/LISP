@@ -5,8 +5,6 @@
 This paper proposes SPLindex, a Spatial Polygon Learned Index, designed for disk-based systems. To achieve this, SPLindex is based on four main ideas: 1) dividing polygons into clusters, 2) mapping clusters to one-dimensional ordering using Z-address, 3) a hierarchical model that predicts cluster IDs for a given spatial queries, and 4) locating polygons on disk layout and accessing via a table for optimal disk access.
 
 ## Highlights
-<<<<<<< HEAD
-
 <ul>
   <li>Spatial object clustering</li>
   <li>Ranking clusters by Z-addresses</li>
@@ -31,7 +29,7 @@ To run the [`main.py`](https://github.com/MasoumehVahedi/SPLindex/blob/master/ma
 
 2. Clone the repository under a directory `data`.
 
-3. Download datasets and put them in the directory specified in [`Config.py`(https://github.com/MasoumehVahedi/SPLindex/blob/master/ConfigParam.py). 
+3. Download datasets and put them in the directory specified in [`Config.py`](https://github.com/MasoumehVahedi/SPLindex/blob/master/ConfigParam.py). 
 
 4. Navigate to the directory and run [`main.py`](https://github.com/MasoumehVahedi/SPLindex/blob/master/main.py).
 
@@ -58,17 +56,6 @@ To run the [`main.py`](https://github.com/MasoumehVahedi/SPLindex/blob/master/ma
     python main.py
     ```
 
-
-=======
-1- Spatial object clustering 
-
-2- Ranking clusters by $Z$-addresses
-
-3- The Hierarchical $Z$-Interval Tree (HZIT)
-
-## Code Structure
-
->>>>>>> 5a1fcd160d020c115ddd524f7ed619dfe9bf3d4f
 ## Datasets
 Link to access datasets:
 
