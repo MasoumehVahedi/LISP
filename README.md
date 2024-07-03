@@ -29,7 +29,7 @@ To run the [`main.py`](https://github.com/MasoumehVahedi/SPLindex/blob/master/ma
 
 2. Clone the repository under a directory `data`.
 
-3. Download datasets and put them in the directory specified in [`Config.py`](https://github.com/MasoumehVahedi/SPLindex/blob/master/ConfigParam.py). 
+3. Download datasets and put them in the directory specified in [`ConfigParam.py`](https://github.com/MasoumehVahedi/SPLindex/blob/master/ConfigParam.py). 
 
 4. Navigate to the directory and run [`main.py`](https://github.com/MasoumehVahedi/SPLindex/blob/master/main.py).
 
@@ -42,12 +42,12 @@ To run the [`main.py`](https://github.com/MasoumehVahedi/SPLindex/blob/master/ma
 
 2. To clone the repository:
     ```sh
-    git clone https://github.com/your-username/your-repository.git data
+    git clone https://github.com/MasoumehVahedi/SPLindex/tree/master
     ```
 
-3. Make sure your [`Config.py`](https://github.com/your-username/your-repository/blob/main/Config.py) file points to the correct dataset directory:
+3. Make sure your [`ConfigParam.py`](https://github.com/MasoumehVahedi/SPLindex/blob/master/ConfigParam.py) file points to the correct dataset directory:
     ```python
-    DATASET_PATH = "path/to/dataset"
+    polygons_path = "path/to/data"
     ```
 
 4. To run the [`main.py`](https://github.com/MasoumehVahedi/SPLindex/blob/master/main.py) file, use:
