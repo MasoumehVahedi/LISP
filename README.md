@@ -13,13 +13,11 @@ This paper proposes SPLindex, a Spatial Polygon Learned Index, designed for disk
 
 
 ## Dependencies
-
-Python 3.9
-
-Numpy
-
-scikit-learn
-
+<ul>
+   <li>Python 3.9</li>
+   <li>Numpy</li>
+   <li>scikit-learn</li>
+<ul>
 
 ## Code Structure
 
