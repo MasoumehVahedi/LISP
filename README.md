@@ -40,7 +40,7 @@ To run the [`main.py`](https://github.com/MasoumehVahedi/SPLindex/blob/master/ma
 
 2. To clone the repository:
     ```sh
-    git clone https://github.com/MasoumehVahedi/SPLindex/tree/master
+    git clone https://github.com/MasoumehVahedi/SPLindex
     ```
 
 3. Make sure your [`ConfigParam.py`](https://github.com/MasoumehVahedi/SPLindex/blob/master/ConfigParam.py) file points to the correct dataset directory:
